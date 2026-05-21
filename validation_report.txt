@@ -1,0 +1,86 @@
+============================================================
+1. DRUG COVERAGE vs GROUND TRUTH (29 drugs)
+============================================================
+Metric                                        Paddle  Tesseract
+---------------------------------------------------------------
+Ground truth drugs                                29         29
+Total drugs extracted (incl. OCR typos)           27         26
+Matched with ground truth                         26         26
+Missed from ground truth                           3          3
+OCR typos / extras not in GT                       1          0
+Coverage % (matched/29)                        89.7%      89.7%
+
+Matched by both engines : ['adrenaline', 'amiodarone', 'atracurium', 'atropine', 'dinoprostone', 'dobutamine', 'glucose', 'heparin', 'ketamine', 'lorazepam', 'mannitol', 'metaraminol', 'midazolam', 'milrinone', 'morphine', 'naloxone', 'neostigmine', 'noradrenaline', 'paracetamol', 'propofol', 'rocuronium', 'sugammadex', 'thiopentone', 'vasopressin']
+Paddle only (GT match)  : ['calcium gluconate', 'sodium bicarbonate']
+Tesseract only (GT match): ['argipressin', 'fentanyl']
+Paddle missed (GT)      : ['argipressin', 'fentanyl', 'glycopyrolate']
+Tesseract missed (GT)   : ['calcium gluconate', 'glycopyrolate', 'sodium bicarbonate']
+Paddle OCR typos        : ['fentany']
+Tesseract OCR typos     : None
+
+============================================================
+2. FIELD RICHNESS (avg fields populated per drug)
+============================================================
+Drug                          Paddle    Tesseract     Winner
+------------------------------------------------------------
+adrenaline                       4.5          0.4     Paddle
+amiodarone                       3.0          1.0     Paddle
+argipressin                        0          1.0  Tesseract
+atracurium                       4.0          0.5     Paddle
+atropine                         3.5          0.0     Paddle
+calcium gluconate                0.0            0     Paddle
+dinoprostone                     2.0          0.0     Paddle
+dobutamine                       5.0          0.3     Paddle
+fentany                          3.0            0     Paddle
+fentanyl                           0          0.0  Tesseract
+glucose                          2.0          0.0     Paddle
+heparin                          5.0          1.0     Paddle
+ketamine                         4.0          0.0     Paddle
+lorazepam                        3.0          1.0     Paddle
+mannitol                         1.0          0.0     Paddle
+metaraminol                      4.0          1.0     Paddle
+midazolam                        4.0          0.3     Paddle
+milrinone                        4.5          0.0     Paddle
+morphine                         5.0          0.3     Paddle
+naloxone                         2.5          0.0     Paddle
+neostigmine                      1.0          0.0     Paddle
+noradrenaline                    4.7          0.0     Paddle
+paracetamol                      6.0          0.0     Paddle
+propofol                         3.5          0.0     Paddle
+rocuronium                       2.0          0.4     Paddle
+sodium bicarbonate               1.0            0     Paddle
+sugammadex                       1.0          0.0     Paddle
+thiopentone                      3.0          0.0     Paddle
+vasopressin                      6.5          0.0     Paddle
+
+============================================================
+3. VALUE MISMATCHES (fields present in both but differ)
+============================================================
+
+Lorazepam:
+  dose: Paddle='0.1 mg/kg' | Tesseract='4mg'
+
+Metaraminol:
+  dose: Paddle='100 micrograms' | Tesseract='10micrograms/kg'
+
+============================================================
+4. DRUGS WITH NO FIELDS EXTRACTED (drug name only)
+============================================================
+Paddle  (1): ['calcium gluconate']
+Tesseract (15): ['atropine', 'dinoprostone', 'fentanyl', 'glucose', 'ketamine', 'mannitol', 'milrinone', 'naloxone', 'neostigmine', 'noradrenaline', 'paracetamol', 'propofol', 'sugammadex', 'thiopentone', 'vasopressin']
+
+============================================================
+5. OVERALL SUMMARY
+============================================================
+Metric                                        Paddle  Tesseract
+---------------------------------------------------------------
+Ground truth drugs                                29         29
+Total drugs extracted (incl. OCR typos)           27         26
+Matched with ground truth                         26         26
+Missed from ground truth                           3          3
+OCR typos / extras not in GT                       1          0
+Coverage % (matched/29)                        89.7%      89.7%
+Total entries extracted                           50         57
+Total fields extracted                           180         15
+Drugs where Paddle wins (GT)                      26
+Recommended engine                            Paddle
