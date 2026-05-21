@@ -15,7 +15,10 @@ pdf_path = "Paediatric-Drug-Chart.pdf"
 # CREATE IMAGE FOLDER
 
 
-os.makedirs("pages", exist_ok=True)
+import shutil
+if os.path.exists("pages"):
+    shutil.rmtree("pages")
+os.makedirs("pages")
 
 
 # CONVERT PDF TO IMAGES
@@ -135,12 +138,12 @@ for img_file in image_files:
 
 final_text = "\n\n".join(all_text)
 
-with open("ocr_output.txt", "w", encoding="utf-8") as f:
+with open("ocr_output_medical.txt", "w", encoding="utf-8") as f:
 
     f.write(final_text)
 
 print("\nOCR COMPLETED")
-print("Output saved as ocr_output.txt")
+print("Output saved as ocr_output_medical.txt")
 
 
 # ACCURACY REPORT
@@ -156,7 +159,7 @@ if accuracy_report:
     print(f"Word Accuracy  : {(1 - avg_wer):.2%}")
     print(f"Char Accuracy  : {(1 - avg_cer):.2%}")
 
-    with open("accuracy_report.txt", "w", encoding="utf-8") as f:
+    with open("accuracy_report_paddle.txt", "w", encoding="utf-8") as f:
 
         f.write(f"{'Page':<20} {'WER':>10} {'CER':>10} {'Word Acc':>12} {'Char Acc':>12}\n")
         f.write("-" * 66 + "\n")
@@ -167,4 +170,4 @@ if accuracy_report:
         f.write("-" * 66 + "\n")
         f.write(f"{'OVERALL':<20} {avg_wer:>10.2%} {avg_cer:>10.2%} {(1-avg_wer):>12.2%} {(1-avg_cer):>12.2%}\n")
 
-    print("Accuracy report saved as accuracy_report.txt")
+    print("Accuracy report saved as accuracy_report_paddle.txt")

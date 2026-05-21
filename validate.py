@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 
-PADDLE_FILE = "structured_drugs.json"
+PADDLE_FILE = "structured_drugs_paddle.json"
 TESS_FILE = "structured_drugs_tesseract.json"
 REPORT_FILE = "validation_report.txt"
 GROUND_TRUTH_FILE = "Paediatric-Drug-Chart.pdf"

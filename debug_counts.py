@@ -9,7 +9,7 @@ GROUND_TRUTH = set([
     "sodium bicarbonate", "sugammadex", "thiopentone", "vasopressin"
 ])
 
-paddle = json.load(open("structured_drugs.json"))
+paddle = json.load(open("structured_drugs_paddle.json"))
 tess = json.load(open("structured_drugs_tesseract.json"))
 
 paddle_found = set(e["drug_name"].strip().lower() for e in paddle)

@@ -7,9 +7,13 @@ venv/
 .venv/
 
 # OCR output files
-ocr_output*.txt
-accuracy_report*.txt
-structured_drugs*.json
+ocr_output_medical.txt
+ocr_output_tesseract.txt
+accuracy_report_paddle.txt
+accuracy_report_tesseract.txt
+structured_drugs_paddle.json
+structured_drugs_tesseract.json
+validation_report.txt
 
 # Generated image folders
 pages/

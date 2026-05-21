@@ -3,7 +3,7 @@ import json
 from collections import defaultdict
 
 INPUT_FILE = "ocr_output_medical.txt"
-OUTPUT_FILE = "structured_drugs.json"
+OUTPUT_FILE = "structured_drugs_paddle.json"
 TESSERACT_INPUT_FILE = "ocr_output_tesseract.txt"
 TESSERACT_OUTPUT_FILE = "structured_drugs_tesseract.json"
 
