@@ -1,0 +1,16 @@
+# OCR dependencies
+paddleocr==2.9.1
+paddlepaddle==2.6.2
+pytesseract==0.3.13
+
+# PDF processing
+pymupdf==1.24.14
+
+# Image processing
+opencv-python==4.10.0.84
+numpy==1.26.4
+
+# Accuracy metrics
+jiwer==3.0.4
+
+# parse_drug_chart.py uses only stdlib: re, json, collections — no installs needed

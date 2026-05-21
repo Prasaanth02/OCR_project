@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# OCR output files
+ocr_output*.txt
+accuracy_report*.txt
+structured_drugs*.json
+
+# Generated image folders
+pages/
+pages_tesseract/
+pages_paddle/
+
+# PaddleOCR model cache
+inference/
+~/.paddleocr/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
