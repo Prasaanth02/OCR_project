@@ -1,3 +1,6 @@
+# Uploads (temp files)
+uploads/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Paediatric Drug Chart Extractor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    header {
+      background: #2b6cb0;
+      color: white;
+      padding: 20px 40px;
+    }
+
+    header h1 { font-size: 1.5rem; }
+    header p  { font-size: 0.9rem; opacity: 0.85; margin-top: 4px; }
+
+    .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+
+    /* Upload card */
+    .upload-card {
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    .upload-card h2 { margin-bottom: 16px; color: #2b6cb0; }
+
+    .drop-zone {
+      border: 2px dashed #90cdf4;
+      border-radius: 8px;
+      padding: 40px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .drop-zone:hover { background: #ebf8ff; }
+    .drop-zone p { color: #718096; margin-top: 8px; font-size: 0.9rem; }
+
+    .drop-zone input[type="file"] { display: none; }
+
+    .file-label {
+      display: inline-block;
+      background: #2b6cb0;
+      color: white;
+      padding: 10px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    #file-name { margin-top: 10px; font-size: 0.85rem; color: #4a5568; }
+
+    #upload-btn {
+      margin-top: 16px;
+      background: #38a169;
+      color: white;
+      border: none;
+      padding: 10px 32px;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: none;
+    }
+
+    #upload-btn:hover { background: #2f855a; }
+
+    /* Spinner */
+    #spinner {
+      display: none;
+      margin: 20px auto;
+      text-align: center;
+      color: #2b6cb0;
+      font-size: 0.95rem;
+    }
+
+    .spinner-ring {
+      display: inline-block;
+      width: 32px; height: 32px;
+      border: 4px solid #bee3f8;
+      border-top-color: #2b6cb0;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Summary */
+    #summary {
+      display: none;
+      margin-top: 24px;
+      display: none;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+      flex: 1;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .stat-card .num { font-size: 2rem; font-weight: 700; color: #2b6cb0; }
+    .stat-card .label { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+
+    /* Filters */
+    #filters {
+      display: none;
+      margin-top: 24px;
+      background: white;
+      border-radius: 8px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+    }
+
+    #filters label { font-weight: 600; margin-right: 10px; }
+
+    #filters select, #filters input {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-right: 12px;
+    }
+
+    /* Table */
+    #results { display: none; margin-top: 24px; }
+
+    #results h2 { margin-bottom: 12px; color: #2b6cb0; }
+
+    .table-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 0.88rem;
+    }
+
+    thead { background: #2b6cb0; color: white; }
+    thead th { padding: 12px 14px; text-align: left; white-space: nowrap; }
+
+    tbody tr:nth-child(even) { background: #f7fafc; }
+    tbody tr:hover { background: #ebf8ff; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue   { background: #bee3f8; color: #2b6cb0; }
+    .badge-green  { background: #c6f6d5; color: #276749; }
+    .badge-orange { background: #feebc8; color: #c05621; }
+    .badge-purple { background: #e9d8fd; color: #553c9a; }
+    .badge-gray   { background: #e2e8f0; color: #4a5568; }
+
+    #error-msg {
+      display: none;
+      margin-top: 16px;
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      color: #c53030;
+      padding: 12px 16px;
+      border-radius: 6px;
+    }
+
+    #download-btn {
+      display: none;
+      margin-top: 16px;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    #download-btn:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Paediatric Drug Chart Extractor</h1>
+  <p>Upload a PDF drug chart to extract structured drug information using OCR</p>
+</header>
+
+<div class="container">
+
+  <!-- Upload -->
+  <div class="upload-card">
+    <h2>Upload Drug Chart PDF</h2>
+    <div class="drop-zone" id="drop-zone">
+      <label class="file-label" for="pdf-input">Choose PDF File</label>
+      <input type="file" id="pdf-input" accept=".pdf" />
+      <p>or drag and drop your PDF here</p>
+    </div>
+    <div id="file-name">No file selected</div>
+    <button id="upload-btn" onclick="uploadPDF()">Extract Drug Information</button>
+    <div id="error-msg"></div>
+  </div>
+
+  <!-- Spinner -->
+  <div id="spinner">
+    <span class="spinner-ring"></span> Processing PDF with OCR, please wait...
+  </div>
+
+  <!-- Summary stats -->
+  <div id="summary" style="display:none; margin-top:24px; gap:16px; flex-wrap:wrap;">
+    <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">Total Entries</div></div>
+    <div class="stat-card"><div class="num" id="stat-unique">0</div><div class="label">Unique Drugs</div></div>
+    <div class="stat-card"><div class="num" id="stat-pages">0</div><div class="label">Pages Processed</div></div>
+    <div class="stat-card"><div class="num" id="stat-cats">0</div><div class="label">Categories</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div id="filters">
+    <label>Filter by Category:</label>
+    <select id="cat-filter" onchange="applyFilters()"><option value="">All</option></select>
+    <label>Search Drug:</label>
+    <input type="text" id="drug-search" placeholder="e.g. Morphine" oninput="applyFilters()" />
+    <button id="download-btn" onclick="downloadJSON()">Download JSON</button>
+  </div>
+
+  <!-- Results table -->
+  <div id="results">
+    <h2>Extracted Drug Information</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Drug Name</th>
+            <th>Category</th>
+            <th>Page</th>
+            <th>Concentration</th>
+            <th>Dose / Dose Range</th>
+            <th>Max Dose</th>
+            <th>Infusion Rate</th>
+            <th>Route</th>
+            <th>Diluent</th>
+            <th>Age Range</th>
+          </tr>
+        </thead>
+        <tbody id="drug-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let allDrugs = [];
+
+  const catColors = {
+    "INDUCTION AGENTS": "badge-blue",
+    "REVERSAL AGENTS": "badge-green",
+    "RESUSCITATION DRUGS": "badge-orange",
+    "PRESSORS": "badge-purple",
+    "ANAPHYLAXIS": "badge-orange",
+    "DEFAULT": "badge-gray"
+  };
+
+  // File input
+  document.getElementById("pdf-input").addEventListener("change", function () {
+    const name = this.files[0]?.name || "No file selected";
+    document.getElementById("file-name").textContent = name;
+    document.getElementById("upload-btn").style.display = this.files[0] ? "inline-block" : "none";
+    document.getElementById("error-msg").style.display = "none";
+  });
+
+  // Drag and drop
+  const dropZone = document.getElementById("drop-zone");
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.style.background = "#ebf8ff"; });
+  dropZone.addEventListener("dragleave", () => { dropZone.style.background = ""; });
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.style.background = "";
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".pdf")) {
+      document.getElementById("pdf-input").files = e.dataTransfer.files;
+      document.getElementById("file-name").textContent = file.name;
+      document.getElementById("upload-btn").style.display = "inline-block";
+    }
+  });
+
+  async function uploadPDF() {
+    const fileInput = document.getElementById("pdf-input");
+    if (!fileInput.files[0]) return;
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    document.getElementById("spinner").style.display = "block";
+    document.getElementById("upload-btn").disabled = true;
+    document.getElementById("results").style.display = "none";
+    document.getElementById("summary").style.display = "none";
+    document.getElementById("filters").style.display = "none";
+    document.getElementById("error-msg").style.display = "none";
+
+    try {
+      const res = await fetch("/upload", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.detail || "Upload failed.");
+        return;
+      }
+
+      allDrugs = data.drugs;
+      renderSummary(data.summary);
+      renderFilters(data.summary.categories);
+      renderTable(allDrugs);
+
+      document.getElementById("summary").style.display = "flex";
+      document.getElementById("filters").style.display = "block";
+      document.getElementById("results").style.display = "block";
+      document.getElementById("download-btn").style.display = "inline-block";
+
+    } catch (err) {
+      showError("Server error: " + err.message);
+    } finally {
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("upload-btn").disabled = false;
+    }
+  }
+
+  function renderSummary(s) {
+    document.getElementById("stat-total").textContent = s.total_drugs;
+    document.getElementById("stat-unique").textContent = s.unique_drug_names;
+    document.getElementById("stat-pages").textContent = s.pages;
+    document.getElementById("stat-cats").textContent = s.categories.length;
+  }
+
+  function renderFilters(categories) {
+    const sel = document.getElementById("cat-filter");
+    sel.innerHTML = '<option value="">All</option>';
+    categories.sort().forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+
+  function applyFilters() {
+    const cat = document.getElementById("cat-filter").value.toLowerCase();
+    const search = document.getElementById("drug-search").value.toLowerCase();
+    const filtered = allDrugs.filter(d => {
+      const matchCat = !cat || (d.category || "").toLowerCase() === cat;
+      const matchSearch = !search || (d.drug_name || "").toLowerCase().includes(search);
+      return matchCat && matchSearch;
+    });
+    renderTable(filtered);
+  }
+
+  function renderTable(drugs) {
+    const tbody = document.getElementById("drug-table-body");
+    tbody.innerHTML = "";
+    if (!drugs.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#718096;padding:20px">No results found.</td></tr>';
+      return;
+    }
+    drugs.forEach(d => {
+      const cat = d.category || "";
+      const colorClass = catColors[cat] || catColors["DEFAULT"];
+      const row = `<tr>
+        <td><strong>${d.drug_name || "-"}</strong></td>
+        <td><span class="badge ${colorClass}">${cat || "-"}</span></td>
+        <td>${d.page || "-"}</td>
+        <td>${d.concentration || "-"}</td>
+        <td>${d.dose_range || d.dose || "-"}</td>
+        <td>${d.max_dose || "-"}</td>
+        <td>${d.infusion_rate || "-"}</td>
+        <td>${d.route || "-"}</td>
+        <td>${d.diluent || "-"}</td>
+        <td>${d.age_range || "-"}</td>
+      </tr>`;
+      tbody.insertAdjacentHTML("beforeend", row);
+    });
+  }
+
+  function downloadJSON() {
+    const blob = new Blob([JSON.stringify(allDrugs, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "extracted_drugs.json";
+    a.click();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("error-msg");
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+</script>
+
+</body>
+</html>

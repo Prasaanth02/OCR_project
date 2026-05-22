@@ -13,4 +13,10 @@ numpy==1.26.4
 # Accuracy metrics
 jiwer==3.0.4
 
+# Web application
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+jinja2==3.1.4
+
 # parse_drug_chart.py uses only stdlib: re, json, collections — no installs needed
