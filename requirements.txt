@@ -10,13 +10,13 @@ pymupdf==1.24.14
 opencv-python==4.10.0.84
 numpy==1.26.4
 
-# Accuracy metrics
-jiwer==3.0.4
+# NER - biomedical drug name extraction
+scispacy==0.5.4
+# After pip install scispacy, install the NER model:
+# pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
 
 # Web application
 fastapi==0.115.0
 uvicorn==0.30.6
 python-multipart==0.0.9
 jinja2==3.1.4
-
-# parse_drug_chart.py uses only stdlib: re, json, collections — no installs needed

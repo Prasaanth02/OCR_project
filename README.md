@@ -1,6 +1,6 @@
 # Paediatric Drug Chart OCR Extractor
 
-A pipeline to extract structured drug information from paediatric drug chart PDFs using OCR (PaddleOCR and Tesseract), with accuracy benchmarking and a FastAPI web interface.
+A pipeline to extract structured drug information from any drug chart PDF using OCR (PaddleOCR or Tesseract) combined with biomedical NER (scispaCy `en_ner_bc5cdr_md`) for drug name detection — no hardcoded drug lists.
 
 ---
 
@@ -9,71 +9,17 @@ A pipeline to extract structured drug information from paediatric drug chart PDF
 ```
 OCR/
 ├── app/
-│   ├── templates/index.html      # Web UI (drag-and-drop PDF upload)
-│   ├── ocr.py                    # PaddleOCR extraction module (used by FastAPI)
-│   └── parser.py                 # Regex-based drug field parser (used by FastAPI)
+│   ├── templates/index.html      # Web UI (drag-and-drop PDF upload + engine toggle)
+│   ├── ocr.py                    # PDF → image → OCR text (PaddleOCR or Tesseract)
+│   └── parser.py                 # scispaCy NER + regex clinical field extraction
 ├── main.py                       # FastAPI web application entry point
-├── main_paddle.py                # Standalone PaddleOCR pipeline with accuracy metrics
-├── main_tesseract.py             # Standalone Tesseract pipeline with accuracy metrics
-├── parse_drug_chart.py           # Parses saved OCR output .txt files → structured JSON
-├── validate.py                   # Compares PaddleOCR vs Tesseract JSON outputs
 ├── requirements.txt              # Python dependencies
-├── Paediatric-Drug-Chart.pdf     # Input PDF
-├── ocr_output_medical.txt        # PaddleOCR raw text output
-├── ocr_output_tesseract.txt      # Tesseract raw text output
-├── structured_drugs_paddle.json  # Structured drug data from PaddleOCR
-├── structured_drugs_tesseract.json
-├── accuracy_report_medical.txt   # WER/CER report for PaddleOCR
-├── accuracy_report_tesseract.txt # WER/CER report for Tesseract
-└── validation_report.txt         # Head-to-head comparison report
+└── Paediatric-Drug-Chart.pdf     # Example input PDF
 ```
 
 ---
 
-## Pipeline Overview
-
-### Pipeline A — Standalone Benchmarking (PaddleOCR vs Tesseract)
-
-```
-PDF
- │
- ├─ fitz (PyMuPDF) → renders each page as PNG (1.5x scale)
- │
- ├─ Image Enhancement (OpenCV)
- │    └─ Grayscale → FastNlMeansDenoising → AdaptiveThreshold (Gaussian, 31×31, C=10)
- │
- ├─ OCR Extraction
- │    ├─ PaddleOCR  (use_angle_cls=True, lang=en)  → main_paddle.py
- │    └─ Tesseract  (--oem 3 --psm 3)              → main_tesseract.py
- │
- ├─ Accuracy Evaluation (jiwer)
- │    ├─ Ground truth = PyMuPDF embedded text (page.get_text())
- │    └─ Reports WER, CER, Word Accuracy, Char Accuracy per page + overall
- │         → accuracy_report_medical.txt
- │         → accuracy_report_tesseract.txt
- │
- ├─ Raw text saved
- │    ├─ ocr_output_medical.txt
- │    └─ ocr_output_tesseract.txt
- │
- ├─ Structured Parsing  (parse_drug_chart.py)
- │    ├─ Detects page markers, category headers, drug names (30-drug dictionary)
- │    ├─ Regex extraction: concentration, dose/dose_range, max_dose, min_dose,
- │    │                     infusion_rate, route, age_range, diluent
- │    └─ Merges multi-line entries belonging to the same drug
- │         → structured_drugs_paddle.json
- │         → structured_drugs_tesseract.json
- │
- └─ Validation  (validate.py)
-      ├─ Drug coverage vs 29 ground-truth drugs
-      ├─ Field richness per drug (avg fields populated)
-      ├─ Value mismatch report (fields present in both but differ)
-      ├─ Drugs with name only (no fields extracted)
-      └─ Overall summary + recommended engine
-           → validation_report.txt
-```
-
-### Pipeline B — FastAPI Web Application
+## Pipeline
 
 ```
 Browser (drag-and-drop PDF + engine toggle: PaddleOCR | Tesseract)
@@ -84,15 +30,35 @@ Browser (drag-and-drop PDF + engine toggle: PaddleOCR | Tesseract)
       ├─ Save PDF to uploads/ (UUID filename, auto-deleted after processing)
       │
       ├─ app/ocr.py  — extract_text_from_pdf(pdf_path, engine)
-      │    ├─ fitz renders pages → uploads/pages_temp/
-      │    ├─ OpenCV enhancement (same as Pipeline A)
-      │    ├─ engine == "paddle"     → PaddleOCR (lazy-loaded on first use)
-      │    ├─ engine == "tesseract"  → pytesseract (--oem 3 --psm 3)
-      │    └─ pages_temp/ cleaned up after extraction
+      │    ├─ fitz (PyMuPDF) renders each page as PNG (1.5x scale)
+      │    ├─ OpenCV enhancement per page
+      │    │    └─ Grayscale → FastNlMeansDenoising → AdaptiveThreshold (Gaussian, 31×31, C=10)
+      │    ├─ engine == "paddle"    → PaddleOCR (lazy-loaded, use_angle_cls=True, lang=en)
+      │    ├─ engine == "tesseract" → pytesseract (--oem 3 --psm 3, confidence > 0 filter)
+      │    └─ uploads/pages_temp/ cleaned up after extraction
       │
-      ├─ app/parser.py  — parse_ocr_text()
-      │    ├─ Same regex patterns as parse_drug_chart.py
-      │    └─ Returns list of structured drug dicts
+      ├─ app/parser.py  — parse_ocr_text(text)
+      │    │
+      │    ├─ NER pass — scispaCy en_ner_bc5cdr_md over full OCR text
+      │    │    └─ Extracts CHEMICAL entities → drug names
+      │    │         No hardcoded drug list — works on any drug chart
+      │    │
+      │    ├─ Line-by-line pass
+      │    │    ├─ Page markers  → track current page
+      │    │    ├─ ALL-CAPS lines → track current category
+      │    │    ├─ NER span overlap → assign drug_name to line
+      │    │    └─ Regex extraction of clinical fields (broad patterns, not chart-specific)
+      │    │         concentration  — e.g. 1mg/ml, 500mcg/ml, 10units/L
+      │    │         dose_range     — e.g. 0.05–0.1mg/kg
+      │    │         dose           — e.g. 0.1mg/kg/hr
+      │    │         max_dose       — e.g. MAX 10mg, maximum 500mcg
+      │    │         min_dose       — e.g. min 2.5mg
+      │    │         infusion_rate  — e.g. 0.5ml/kg/hr, 10ml/hr
+      │    │         route          — IV, IM, SC, oral, intranasal, intraosseous, etc.
+      │    │         diluent        — NaCl, glucose, D5W, D10W, Hartmann's, WFI, etc.
+      │    │         age_range      — Under 10kg, 1 month to 2 years, 12 years+, etc.
+      │    │
+      │    └─ Merge consecutive lines belonging to the same drug entry
       │
       └─ JSON response
            ├─ summary: { total_drugs, unique_drug_names, categories, pages, engine }
@@ -110,6 +76,17 @@ The upload card contains a **PaddleOCR / Tesseract toggle** (pill-style radio bu
 - After results load, a coloured badge next to the results heading shows the engine used
   - Blue badge → PaddleOCR
   - Yellow badge → Tesseract
+
+---
+
+## Why scispaCy instead of a fixed drug list
+
+| Approach | Generalisation | Maintenance |
+|---|---|---|
+| Hardcoded `KNOWN_DRUGS` list | Only works for those exact 30 drugs | Must be updated for every new chart |
+| scispaCy `en_ner_bc5cdr_md` | Recognises any drug/chemical name it was trained on (BC5CDR corpus — thousands of biomedical entities) | No maintenance, works across charts |
+
+The model is pretrained on the **BC5CDR biomedical corpus** and recognises `CHEMICAL` (drugs, compounds) and `DISEASE` entities. Only `CHEMICAL` entities are used as drug names here.
 
 ---
 
@@ -136,6 +113,9 @@ The upload card contains a **PaddleOCR / Tesseract toggle** (pill-style radio bu
 
 ```bash
 pip install -r requirements.txt
+
+# Install the scispaCy biomedical NER model
+pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
 ```
 
 > Tesseract binary must be installed separately and available on PATH:
@@ -146,45 +126,11 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Run PaddleOCR benchmark pipeline
-
-```bash
-python main_paddle.py
-```
-
-Outputs: `ocr_output_medical.txt`, `accuracy_report_medical.txt`
-
-### Run Tesseract benchmark pipeline
-
-```bash
-python main_tesseract.py
-```
-
-Outputs: `ocr_output_tesseract.txt`, `accuracy_report_tesseract.txt`
-
-### Parse OCR output to structured JSON
-
-```bash
-python parse_drug_chart.py
-```
-
-Outputs: `structured_drugs_paddle.json`, `structured_drugs_tesseract.json`
-
-### Validate and compare both engines
-
-```bash
-python validate.py
-```
-
-Outputs: `validation_report.txt`
-
-### Run the web application
-
 ```bash
 uvicorn main:app --reload
 ```
 
-Open `http://localhost:8000` in your browser, upload a PDF, and get structured drug data instantly.
+Open `http://localhost:8000`, upload any drug chart PDF, select PaddleOCR or Tesseract, and get structured drug data instantly.
 
 ---
 
@@ -193,11 +139,11 @@ Open `http://localhost:8000` in your browser, upload a PDF, and get structured d
 | Package | Purpose |
 |---|---|
 | `paddleocr` + `paddlepaddle` | Primary OCR engine |
-| `pytesseract` | Secondary OCR engine (benchmarking) |
-| `pymupdf` (fitz) | PDF → image conversion, ground truth text |
+| `pytesseract` | Secondary OCR engine |
+| `pymupdf` (fitz) | PDF → image conversion |
 | `opencv-python` | Image enhancement (denoise + threshold) |
 | `numpy` | Array operations for image processing |
-| `jiwer` | WER / CER accuracy metrics |
+| `scispacy` + `en_ner_bc5cdr_md` | Biomedical NER — drug name extraction |
 | `fastapi` + `uvicorn` | Web API server |
 | `python-multipart` | File upload handling |
 | `jinja2` | HTML templating |
