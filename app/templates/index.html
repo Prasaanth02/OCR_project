@@ -60,6 +60,48 @@
 
     #file-name { margin-top: 10px; font-size: 0.85rem; color: #4a5568; }
 
+    /* Engine toggle */
+    .engine-toggle {
+      display: inline-flex;
+      border: 2px solid #2b6cb0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0 4px;
+    }
+
+    .engine-toggle input[type="radio"] { display: none; }
+
+    .engine-toggle label {
+      padding: 8px 28px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #2b6cb0;
+      background: white;
+      transition: background 0.2s, color 0.2s;
+      user-select: none;
+    }
+
+    .engine-toggle input[type="radio"]:checked + label {
+      background: #2b6cb0;
+      color: white;
+    }
+
+    .engine-toggle label:not(:last-child) { border-right: 2px solid #2b6cb0; }
+
+    .engine-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .engine-paddle  { background: #bee3f8; color: #2b6cb0; }
+    .engine-tesseract { background: #fefcbf; color: #975a16; }
+
     #upload-btn {
       margin-top: 16px;
       background: #38a169;
@@ -216,6 +258,19 @@
       <p>or drag and drop your PDF here</p>
     </div>
     <div id="file-name">No file selected</div>
+
+    <!-- Engine selector -->
+    <div style="margin-top:16px;">
+      <div style="font-size:0.85rem;color:#4a5568;margin-bottom:6px;font-weight:600;">Select OCR Engine</div>
+      <div class="engine-toggle">
+        <input type="radio" id="engine-paddle" name="engine" value="paddle" checked />
+        <label for="engine-paddle">🚀 PaddleOCR</label>
+        <input type="radio" id="engine-tesseract" name="engine" value="tesseract" />
+        <label for="engine-tesseract">🔬 Tesseract</label>
+      </div>
+      <div style="font-size:0.78rem;color:#718096;margin-top:6px;" id="engine-hint">PaddleOCR — higher accuracy, slower on first run</div>
+    </div>
+
     <button id="upload-btn" onclick="uploadPDF()">Extract Drug Information</button>
     <div id="error-msg"></div>
   </div>
@@ -244,7 +299,7 @@
 
   <!-- Results table -->
   <div id="results">
-    <h2>Extracted Drug Information</h2>
+    <h2>Extracted Drug Information <span class="engine-badge" id="engine-used-badge"></span></h2>
     <div class="table-wrap">
       <table>
         <thead>
@@ -270,6 +325,17 @@
 
 <script>
   let allDrugs = [];
+
+  // Update hint text when engine selection changes
+  document.querySelectorAll('input[name="engine"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      const hints = {
+        paddle: "PaddleOCR \u2014 higher accuracy, slower on first run",
+        tesseract: "Tesseract \u2014 faster, requires binary installed on PATH"
+      };
+      document.getElementById("engine-hint").textContent = hints[radio.value];
+    });
+  });
 
   const catColors = {
     "INDUCTION AGENTS": "badge-blue",
@@ -307,8 +373,11 @@
     const fileInput = document.getElementById("pdf-input");
     if (!fileInput.files[0]) return;
 
+    const engine = document.querySelector('input[name="engine"]:checked').value;
+
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
+    formData.append("engine", engine);
 
     document.getElementById("spinner").style.display = "block";
     document.getElementById("upload-btn").disabled = true;
@@ -330,6 +399,11 @@
       renderSummary(data.summary);
       renderFilters(data.summary.categories);
       renderTable(allDrugs);
+
+      const eng = data.summary.engine || "paddle";
+      const badge = document.getElementById("engine-used-badge");
+      badge.textContent = eng === "paddle" ? "PaddleOCR" : "Tesseract";
+      badge.className = "engine-badge " + (eng === "paddle" ? "engine-paddle" : "engine-tesseract");
 
       document.getElementById("summary").style.display = "flex";
       document.getElementById("filters").style.display = "block";

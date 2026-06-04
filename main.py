@@ -1,6 +1,6 @@
 import os
 import uuid
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -21,30 +21,28 @@ async def index(request: Request):
 
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), engine: str = Form("paddle")):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if engine not in ("paddle", "tesseract"):
+        raise HTTPException(status_code=400, detail="engine must be 'paddle' or 'tesseract'.")
 
-    # save uploaded file temporarily
     temp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}.pdf")
     try:
         contents = await file.read()
         with open(temp_path, "wb") as f:
             f.write(contents)
 
-        # run OCR
-        ocr_text = extract_text_from_pdf(temp_path)
-
-        # run parser
+        ocr_text = extract_text_from_pdf(temp_path, engine=engine)
         drugs = parse_ocr_text(ocr_text)
 
-        # summary stats
         categories = list({d.get("category", "GENERAL") for d in drugs})
         summary = {
             "total_drugs": len(drugs),
             "unique_drug_names": len({d.get("drug_name", "") for d in drugs if "drug_name" in d}),
             "categories": categories,
             "pages": len({d.get("page") for d in drugs if d.get("page")}),
+            "engine": engine,
         }
 
         return JSONResponse({"summary": summary, "drugs": drugs})
