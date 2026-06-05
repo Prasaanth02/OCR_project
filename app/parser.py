@@ -15,15 +15,36 @@ def _get_nlp():
     return _nlp
 
 
+# Things NER wrongly labels as CHEMICAL — units, diluents, admin abbreviations
+_NOT_DRUG = re.compile(
+    r"^(dob|d\.o\.b|nhs|cga|date.*|time.*|batch|ward|weight|name|no\.|number"
+    r"|glu|nacl|d5w|d10w|glucose|dextrose|sodium chloride|water|wfi|saline"
+    r"|micrograms?.*|nanograms?.*|units?|milliunits?|mmol|meq|mcg|mg|ml|kg|hr|min"
+    r"|[\d\s\.\-/]+)$",
+    re.IGNORECASE,
+)
+
+
 def _extract_drug_names(text: str) -> list[tuple[int, int, str]]:
-    """Return list of (start_char, end_char, drug_name) from NER on the full text block."""
+    """Return list of (start_char, end_char, drug_name) from NER, noise filtered."""
     nlp = _get_nlp()
-    doc = nlp(text[:100000])  # spaCy limit guard
-    return [
-        (ent.start_char, ent.end_char, ent.text.strip())
-        for ent in doc.ents
-        if ent.label_ == "CHEMICAL"
-    ]
+    doc = nlp(text[:100000])
+    results = []
+    for ent in doc.ents:
+        if ent.label_ != "CHEMICAL":
+            continue
+        name = ent.text.strip()
+        # skip short tokens, noise patterns, newline-spanning spans, unit-heavy strings
+        if len(name) < 4:
+            continue
+        if _NOT_DRUG.match(name):
+            continue
+        if "\n" in name:
+            continue
+        if sum(c.isalpha() for c in name) < len(name) * 0.5:
+            continue
+        results.append((ent.start_char, ent.end_char, name))
+    return results
 
 
 # --- Clinical field patterns (broad, not chart-specific) ---
@@ -75,6 +96,13 @@ _PATTERNS = {
     ),
     "page_marker": re.compile(r"^---\s*page_\d+\.png\s*---$"),
     "category_header": re.compile(r"^[A-Z][A-Z\s/]{4,}$"),
+    # Patient metadata lines to skip
+    "skip_line": re.compile(
+        r"\b(date of birth|dob|d\.o\.b|patient name|name:|nhs|hospital no"
+        r"|ward:|consultant:|weight:|allergies|signature|signed|print name"
+        r"|prescribed by|checked by|administered by|date:|time:)\b",
+        re.IGNORECASE,
+    ),
 }
 
 
@@ -123,11 +151,8 @@ def _extract_fields(line: str) -> dict:
 def parse_ocr_text(text: str) -> list[dict]:
     # Step 1 — run NER on the full text once to find all drug name spans
     drug_spans = _extract_drug_names(text)
-    drug_char_set = set()
-    for start, end, _ in drug_spans:
-        drug_char_set.update(range(start, end))
 
-    lines = text.splitlines()
+    lines = text.splitlines(keepends=True)
     results = []
     current_category = "GENERAL"
     current_page = None
@@ -136,7 +161,8 @@ def parse_ocr_text(text: str) -> list[dict]:
     for raw_line in lines:
         line = raw_line.strip()
         line_start = char_offset
-        char_offset += len(raw_line) + 1  # +1 for newline
+        line_end = char_offset + len(raw_line)
+        char_offset = line_end
 
         if not line:
             continue
@@ -145,24 +171,28 @@ def parse_ocr_text(text: str) -> list[dict]:
             current_page = re.search(r"page_\d+", line).group(0)
             continue
 
-        if _PATTERNS["category_header"].match(line):
+        # Skip patient metadata / admin lines
+        if _PATTERNS["skip_line"].search(line):
+            continue
+
+        # Only treat as category header if NER found no drug on this line
+        line_has_drug = any(s >= line_start and e <= line_end for s, e, _ in drug_spans)
+        if _PATTERNS["category_header"].match(line) and not line_has_drug:
             current_category = line
             continue
 
-        # Check if any NER drug span overlaps this line
-        line_end = line_start + len(line)
+        # Assign drug name if any NER span falls within this line
         drug_name = None
         for start, end, name in drug_spans:
-            if start >= line_start and end <= line_start + len(raw_line):
+            if start >= line_start and end <= line_end:
                 drug_name = name.title()
                 break
 
         fields = _extract_fields(line)
 
-        if drug_name:
+        # Only record if there is at least one clinical field alongside the drug name
+        if drug_name and fields:
             fields["drug_name"] = drug_name
-
-        if fields:
             fields["category"] = current_category
             fields["page"] = current_page
             results.append(fields)
@@ -182,8 +212,6 @@ def _merge_entries(entries: list[dict]) -> list[dict]:
             for key, val in entry.items():
                 if key not in ("category", "page", "drug_name") and key not in current:
                     current[key] = val
-        else:
-            merged.append(entry)
     if current:
         merged.append(current)
     return merged
