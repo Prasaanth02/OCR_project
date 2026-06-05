@@ -191,7 +191,6 @@ def parse_ocr_text(text: str) -> list[dict]:
             continue
 
         if idx in line_drug_map:
-            # Save previous entry, start a new one
             if current_entry:
                 results.append(current_entry)
             current_entry = {
@@ -199,9 +198,10 @@ def parse_ocr_text(text: str) -> list[dict]:
                 "category": current_category,
                 "page": current_page,
             }
-            # also extract any fields on the same line as the drug name
             fields = _extract_fields(line)
-            current_entry.update(fields)
+            for k, v in fields.items():
+                if k not in current_entry:
+                    current_entry[k] = v
         else:
             # Accumulate clinical fields into the current drug entry
             fields = _extract_fields(line)

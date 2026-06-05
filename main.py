@@ -38,6 +38,11 @@ def upload_pdf(file: UploadFile = File(...), engine: str = Form("paddle")):
         ocr_text = extract_text_from_pdf(temp_path, engine=engine)
         drugs = parse_ocr_text(ocr_text)
         drugs = [d for d in drugs if isinstance(d, dict)]
+        # sanitize: ensure all values are plain strings
+        safe_drugs = []
+        for d in drugs:
+            safe_drugs.append({k: str(v) if not isinstance(v, str) else v for k, v in d.items()})
+        drugs = safe_drugs
 
         categories = list({d.get("category") or "GENERAL" for d in drugs})
         summary = {
