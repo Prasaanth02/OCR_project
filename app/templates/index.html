@@ -140,9 +140,7 @@
 
     /* Summary */
     #summary {
-      display: none;
       margin-top: 24px;
-      display: none;
       gap: 16px;
       flex-wrap: wrap;
     }
@@ -388,6 +386,11 @@
 
     try {
       const res = await fetch("/upload", { method: "POST", body: formData });
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        showError("Server error (" + res.status + "): " + await res.text());
+        return;
+      }
       const data = await res.json();
 
       if (!res.ok) {

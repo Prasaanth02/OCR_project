@@ -5,6 +5,8 @@ import os
 import shutil
 from paddleocr import PaddleOCR
 import pytesseract
+import logging
+logging.getLogger("ppocr").setLevel(logging.WARNING)
 
 _paddle_ocr = None
 
@@ -12,7 +14,7 @@ _paddle_ocr = None
 def _get_paddle():
     global _paddle_ocr
     if _paddle_ocr is None:
-        _paddle_ocr = PaddleOCR(use_angle_cls=True, lang="en")
+        _paddle_ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
     return _paddle_ocr
 
 
