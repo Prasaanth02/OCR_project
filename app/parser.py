@@ -149,21 +149,30 @@ def _extract_fields(line: str) -> dict:
 
 
 def parse_ocr_text(text: str) -> list[dict]:
-    # Step 1 — run NER on the full text once to find all drug name spans
+    # Step 1 — NER over full text to locate all drug name spans
     drug_spans = _extract_drug_names(text)
 
+    # Build a char-offset → drug_name lookup
     lines = text.splitlines(keepends=True)
-    results = []
-    current_category = "GENERAL"
-    current_page = None
+    line_drug_map: dict[int, str] = {}  # line_index → drug_name
     char_offset = 0
-
-    for raw_line in lines:
-        line = raw_line.strip()
+    for idx, raw_line in enumerate(lines):
         line_start = char_offset
         line_end = char_offset + len(raw_line)
         char_offset = line_end
+        for start, end, name in drug_spans:
+            if start >= line_start and end <= line_end:
+                line_drug_map[idx] = name.title()
+                break
 
+    # Step 2 — pass through lines, group into drug entries
+    results = []
+    current_category = "GENERAL"
+    current_page = None
+    current_entry: dict | None = None
+
+    for idx, raw_line in enumerate(lines):
+        line = raw_line.strip()
         if not line:
             continue
 
@@ -171,33 +180,43 @@ def parse_ocr_text(text: str) -> list[dict]:
             current_page = re.search(r"page_\d+", line).group(0)
             continue
 
-        # Skip patient metadata / admin lines
         if _PATTERNS["skip_line"].search(line):
             continue
 
-        # Only treat as category header if NER found no drug on this line
-        line_has_drug = any(s >= line_start and e <= line_end for s, e, _ in drug_spans)
-        if _PATTERNS["category_header"].match(line) and not line_has_drug:
+        if _PATTERNS["category_header"].match(line) and idx not in line_drug_map:
+            if current_entry:
+                results.append(current_entry)
+                current_entry = None
             current_category = line
             continue
 
-        # Assign drug name if any NER span falls within this line
-        drug_name = None
-        for start, end, name in drug_spans:
-            if start >= line_start and end <= line_end:
-                drug_name = name.title()
-                break
+        if idx in line_drug_map:
+            # Save previous entry, start a new one
+            if current_entry:
+                results.append(current_entry)
+            current_entry = {
+                "drug_name": line_drug_map[idx],
+                "category": current_category,
+                "page": current_page,
+            }
+            # also extract any fields on the same line as the drug name
+            fields = _extract_fields(line)
+            current_entry.update(fields)
+        else:
+            # Accumulate clinical fields into the current drug entry
+            fields = _extract_fields(line)
+            if fields and current_entry is not None:
+                for key, val in fields.items():
+                    if key not in current_entry:
+                        current_entry[key] = val
 
-        fields = _extract_fields(line)
+    if current_entry:
+        results.append(current_entry)
 
-        # Only record if there is at least one clinical field alongside the drug name
-        if drug_name and fields:
-            fields["drug_name"] = drug_name
-            fields["category"] = current_category
-            fields["page"] = current_page
-            results.append(fields)
-
-    return _merge_entries(results)
+    # Only return entries that have at least one clinical field beyond the name
+    clinical_keys = {"concentration", "dose", "dose_range", "max_dose",
+                     "min_dose", "infusion_rate", "route", "diluent", "age_range"}
+    return [e for e in results if clinical_keys & e.keys()]
 
 
 def _merge_entries(entries: list[dict]) -> list[dict]:

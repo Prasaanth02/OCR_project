@@ -4,12 +4,22 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.ocr import extract_text_from_pdf
 from app.parser import parse_ocr_text
 
 app = FastAPI(title="Paediatric Drug Chart Extractor")
 templates = Jinja2Templates(directory="app/templates")
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request, exc):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -36,16 +46,22 @@ async def upload_pdf(file: UploadFile = File(...), engine: str = Form("paddle"))
         ocr_text = extract_text_from_pdf(temp_path, engine=engine)
         drugs = parse_ocr_text(ocr_text)
 
-        categories = list({d.get("category", "GENERAL") for d in drugs})
+        # ensure drugs is a flat list of dicts
+        drugs = [d for d in drugs if isinstance(d, dict)]
+
+        categories = list({d.get("category") or "GENERAL" for d in drugs})
         summary = {
             "total_drugs": len(drugs),
-            "unique_drug_names": len({d.get("drug_name", "") for d in drugs if "drug_name" in d}),
+            "unique_drug_names": len({d.get("drug_name", "") for d in drugs if d.get("drug_name")}),
             "categories": categories,
             "pages": len({d.get("page") for d in drugs if d.get("page")}),
             "engine": engine,
         }
 
         return JSONResponse({"summary": summary, "drugs": drugs})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         if os.path.exists(temp_path):
