@@ -38,7 +38,8 @@ def _render_pages(pdf_path: str, pages_dir: str):
     image_paths = []
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+        # 2.0x scale gives sharper text — better for tables with small fonts
+        pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
         img_path = f"{pages_dir}/page_{page_num + 1}.png"
         pix.save(img_path)
         enhance_image(img_path)
@@ -52,19 +53,17 @@ def extract_text_from_pdf(pdf_path: str, engine: str = "paddle") -> str:
     all_text = []
 
     if engine == "tesseract":
-        tess_config = r"--oem 3 --psm 3"
+        # PSM 6 = assume a single uniform block of text — preserves line structure
+        # better than PSM 3 for dense clinical tables
+        tess_config = r"--oem 3 --psm 6"
         for page_num, img_path in image_paths:
             img = cv2.imread(img_path)
-            data = pytesseract.image_to_data(
-                img, config=tess_config,
-                output_type=pytesseract.Output.DICT
-            )
-            page_text = [
-                data["text"][i].strip()
-                for i, conf in enumerate(data["conf"])
-                if int(conf) > 0 and data["text"][i].strip()
-            ]
-            all_text.append(f"--- page_{page_num}.png ---\n" + "\n".join(page_text))
+            # image_to_string preserves newlines / line grouping (unlike image_to_data
+            # which returns one word per row, destroying table row context)
+            raw = pytesseract.image_to_string(img, config=tess_config)
+            # Keep non-empty lines only
+            page_lines = [l for l in raw.splitlines() if l.strip()]
+            all_text.append(f"--- page_{page_num}.png ---\n" + "\n".join(page_lines))
     else:
         ocr = _get_paddle()
         for page_num, img_path in image_paths:
